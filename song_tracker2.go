@@ -10,8 +10,8 @@ package main
 
 import (
 	"database/sql"
-	"errors"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	_ "github.com/lib/pq"
@@ -369,14 +369,14 @@ func (handler HttpHandler) ServeHTTP(rw http.ResponseWriter,
 	// define our handlers.
 	var handlers = []RequestHandler{
 		RequestHandler{
-			Method: "GET",
+			Method:      "GET",
 			PathPattern: "^" + handler.settings.UriPrefix + "/top/artists",
-			Func: handlerTopArtists,
+			Func:        handlerTopArtists,
 		},
 		RequestHandler{
-			Method: "GET",
+			Method:      "GET",
 			PathPattern: "^" + handler.settings.UriPrefix + "/top/songs",
-			Func: handlerTopSongs,
+			Func:        handlerTopSongs,
 		},
 	}
 
