@@ -120,12 +120,12 @@ func send500Error(rw http.ResponseWriter, message string) {
 	rw.Write([]byte(message))
 }
 
-// getParametersTopArtists retrieves and validates parameters to a
-// top artists request.
+// getParametersTopRequest retrieves and validates parameters to a
+// top artists/songs request.
 // we return: user_id, limit (limit of top count), days back to build
 //   the top artists count for. if days back is -1, we find the count
 //   for all time.
-func getParametersTopArtists(request *http.Request) (int64, int64, int64, error) {
+func getParametersTopRequest(request *http.Request) (int64, int64, int64, error) {
 	// pull the parameters out and convert and validate them.
 	err := request.ParseForm()
 	if err != nil {
@@ -229,8 +229,61 @@ LIMIT $3
 	return results, nil
 }
 
+// retrieveTopSongs retrieves the top song counts.
+// we find the top 'limit' artists for the given user.
+// we do this for the specified number of days back. if the given
+// days back is set as -1, we find the top songs of all time.
+func retrieveTopSongs(settings *Config, userId int64, limit int64,
+	daysBack int64) ([]TopResult, error) {
+	// we need a database connection.
+	// TODO: we could try a cache first.
+	db, err := getDb(settings)
+	if err != nil {
+		return nil, err
+	}
+
+	query := `
+SELECT
+COUNT(1) AS count,
+CONCAT(s.artist, ' - ', s.title) AS label
+FROM play p
+LEFT JOIN song s
+ON p.song_id = s.id
+WHERE
+p.user_id = $1
+AND p.create_time > current_timestamp - CAST($2 AS INTERVAL)
+GROUP BY label
+ORDER BY count DESC
+LIMIT $3
+`
+	interval := fmt.Sprintf("%d days", daysBack)
+	if daysBack == -1 {
+		// arbitrary. another alternative is to take out the create_time
+		// comparison, but that means having a separate query (or messing
+		// around with parameters more than I want)
+		interval = "1000 years"
+	}
+	log.Printf("Using interval [%s]", interval)
+
+	rows, err := db.Query(query, userId, interval, limit)
+	if err != nil {
+		return nil, err
+	}
+
+	var results []TopResult
+	for rows.Next() {
+		var result TopResult
+		err := rows.Scan(&result.Count, &result.Label)
+		if err != nil {
+			return nil, err
+		}
+		results = append(results, result)
+	}
+	return results, nil
+}
+
 // responseTopCount sends the response to a top artists or songs request.
-func responseTopArtists(rw http.ResponseWriter, counts []TopResult) error {
+func responseTopCount(rw http.ResponseWriter, counts []TopResult) error {
 	type TopResponse struct {
 		Counts []TopResult
 	}
@@ -248,7 +301,7 @@ func responseTopArtists(rw http.ResponseWriter, counts []TopResult) error {
 func handlerTopArtists(rw http.ResponseWriter, request *http.Request,
 	settings *Config) {
 	// find our parameters.
-	userId, limit, daysBack, err := getParametersTopArtists(request)
+	userId, limit, daysBack, err := getParametersTopRequest(request)
 	if err != nil {
 		msg := fmt.Sprintf("Failed to retrieve parameters: %s", err.Error())
 		log.Printf(msg)
@@ -266,7 +319,7 @@ func handlerTopArtists(rw http.ResponseWriter, request *http.Request,
 	}
 
 	// build and send the response.
-	err = responseTopArtists(rw, counts)
+	err = responseTopCount(rw, counts)
 	if err != nil {
 		msg := fmt.Sprintf("Failed to generate response: %s", err.Error())
 		log.Printf(msg)
@@ -278,7 +331,32 @@ func handlerTopArtists(rw http.ResponseWriter, request *http.Request,
 // handlerTopSongs looks up the top songs for a user.
 func handlerTopSongs(rw http.ResponseWriter, request *http.Request,
 	settings *Config) {
-	// TODO
+	// find our parameters.
+	userId, limit, daysBack, err := getParametersTopRequest(request)
+	if err != nil {
+		msg := fmt.Sprintf("Failed to retrieve parameters: %s", err.Error())
+		log.Printf(msg)
+		send500Error(rw, msg)
+		return
+	}
+
+	// find the counts.
+	counts, err := retrieveTopSongs(settings, userId, limit, daysBack)
+	if err != nil {
+		msg := fmt.Sprintf("Failed to retrieve top artists: %s", err.Error())
+		log.Printf(msg)
+		send500Error(rw, msg)
+		return
+	}
+
+	// build and send the response.
+	err = responseTopCount(rw, counts)
+	if err != nil {
+		msg := fmt.Sprintf("Failed to generate response: %s", err.Error())
+		log.Printf(msg)
+		send500Error(rw, msg)
+		return
+	}
 }
 
 // ServeHTTP is a function to implement the http.Handler interface.
