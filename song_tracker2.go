@@ -405,11 +405,13 @@ func (handler HttpHandler) ServeHTTP(rw http.ResponseWriter,
 
 // main is the entry point of the program.
 func main() {
-	log.SetFlags(log.Ltime)
+	log.SetFlags(log.Ldate | log.Ltime)
 
 	// command line arguments.
 	configPath := flag.String("config-file", "",
 		"Path to a configuration file.")
+	logPath := flag.String("log-file", "",
+		"Path to a log file.")
 	flag.Parse()
 	// config file is required.
 	if len(*configPath) == 0 {
@@ -417,12 +419,27 @@ func main() {
 		flag.PrintDefaults()
 		os.Exit(1)
 	}
+	if len(*logPath) == 0 {
+		log.Print("You must specify a log file.")
+		flag.PrintDefaults()
+		os.Exit(1)
+	}
+
+	// open log file.
+	// don't use os.Create() because that truncates.
+	logFh, err := os.OpenFile(*logPath, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644)
+	if err != nil {
+		log.Printf("Failed to open log file: %s: %s", *logPath, err.Error())
+		os.Exit(1)
+	}
+	log.SetOutput(logFh)
 
 	// load up our settings.
 	var settings Config
-	err := config.GetConfig(*configPath, &settings)
+	err = config.GetConfig(*configPath, &settings)
 	if err != nil {
-		log.Fatalf("Failed to retrieve config: %s", err.Error())
+		log.Printf("Failed to retrieve config: %s", err.Error())
+		os.Exit(1)
 	}
 
 	// start listening.
@@ -430,7 +447,8 @@ func main() {
 		settings.ListenPort)
 	listener, err := net.Listen("tcp", listenHostPort)
 	if err != nil {
-		log.Fatal("Failed to open port: " + err.Error())
+		log.Print("Failed to open port: " + err.Error())
+		os.Exit(1)
 	}
 
 	httpHandler := HttpHandler{settings: &settings}
@@ -440,6 +458,7 @@ func main() {
 	log.Print("Starting to serve requests.")
 	err = fcgi.Serve(listener, httpHandler)
 	if err != nil {
-		log.Fatal("Failed to start serving HTTP: " + err.Error())
+		log.Print("Failed to start serving HTTP: " + err.Error())
+		os.Exit(1)
 	}
 }
