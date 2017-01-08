@@ -15,7 +15,8 @@ import (
 	"flag"
 	"log"
 	"os"
-	"summercat.com/song_tracker2/client"
+
+	"github.com/horgh/song_tracker2/client"
 )
 
 // Args describes arguments on command line

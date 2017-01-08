@@ -11,7 +11,8 @@ import (
 	"net/url"
 	"os"
 	"strings"
-	"summercat.com/taglib"
+
+	"github.com/horgh/taglib"
 )
 
 // hold configuration

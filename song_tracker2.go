@@ -14,7 +14,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	_ "github.com/lib/pq"
 	"log"
 	"net"
 	"net/http"
@@ -22,7 +21,9 @@ import (
 	"os"
 	"regexp"
 	"strconv"
-	"summercat.com/config"
+
+	"github.com/horgh/config"
+	_ "github.com/lib/pq"
 )
 
 // Config holds our config keys.
