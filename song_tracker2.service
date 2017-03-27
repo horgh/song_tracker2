@@ -1,0 +1,11 @@
+[Unit]
+Requires=network.target
+After=network.target
+
+[Service]
+User=will
+Group=will
+ExecStart=/home/will/code/go/src/github.com/horgh/song_tracker2/song_tracker2 -config-file /home/will/code/go/src/github.com/horgh/song_tracker2/song_tracker2.conf -log-file /var/log/song_tracker2.log
+
+[Install]
+WantedBy=multi-user.target
